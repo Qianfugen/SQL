@@ -1,0 +1,70 @@
+select * from emp 
+
+--测试游标
+declare
+
+begin
+    update emp set sal=5000 where empno in (7782,7788);
+    if sql%isopen then
+       dbms_output.put_line('游标已打开');
+    else
+       dbms_output.put_line('游标未打开');
+    end if;
+    
+    if sql%found then
+       dbms_output.put_line('执行成功');
+    else
+       dbms_output.put_line('执行失败');
+    end if;
+    
+    if sql%notfound then 
+       dbms_output.put_line('执行失败');
+    else
+       dbms_output.put_line('执行成功');
+    end if;
+    
+end;
+
+--使用loop循环
+declare 
+    cursor cs_emp is select * from emp;
+    row_emp emp%rowtype;
+begin
+    open cs_emp;
+    loop
+         fetch cs_emp into row_emp;
+         exit when cs_emp%notfound;
+         dbms_output.put_line('loop员工编号：'||row_emp.empno||'，员工姓名:'||row_emp.ename||',员工薪资：'||row_emp.sal);
+    end loop;
+    close cs_emp;
+end;
+
+--使用while循环
+declare 
+    cursor cs_emp is select * from emp;
+    row_emp emp%rowtype; 
+begin
+    open cs_emp;
+    fetch cs_emp into row_emp;
+    while cs_emp%found loop
+          dbms_output.put_line('while员工编号：'||row_emp.empno||'，员工姓名:'||row_emp.ename||',员工薪资：'||row_emp.sal);
+          fetch cs_emp into row_emp;
+    end loop;
+    close cs_emp;
+end;
+
+--使用for循环
+declare 
+    cursor cs_emp is select * from emp;
+    row_emp emp%rowtype;
+begin
+    for row_emp in cs_emp loop
+        dbms_output.put_line('for员工编号：'||row_emp.empno||'，员工姓名:'||row_emp.ename||',员工薪资：'||row_emp.sal);
+    end loop;
+end;
+
+
+
+
+
+
