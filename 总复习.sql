@@ -433,3 +433,200 @@ from emp group by deptno;
 
 
 ------------------------------------------------------------------------------------------
+
+--rownum和rowid
+  /*
+    rownum(是查询的时候动态生成的):当使用sql语句进行查询完成的时候,oracle会自动的给每一行数据按照结果集的顺序编号
+    如果作为条件取排名的时候,默认必须包含1 
+    如果即有排序又有rownum系统会给每行加rownum然后在排序(主键以及有索引列除外)
+  */
+--取前3行
+select * from emp where rownum<=3;
+--按工资排序取前三行
+select * from (select * from emp order by sal desc) where rownum<=3;
+--按工资排序取第三行
+select e3.* from(
+select e2.*,rownum r from 
+(select e1.* from emp e1 order by sal desc)e2
+)e3 where r=3;
+
+  /*
+  保存rowid需要10个字节或者是80个位二进制位。这80个二进制位分别是：
+      1. 数据对象编号，表明此行所属的数据库对象的编号，每个数据对象在数据库建立的时候都被唯一分配一个编号，并且此编号唯一。数据对象编号占用大约32位。
+      2. 对应文件编号，表明该行所在文件的编号，表空间的每一个文件标号都是唯一的。文件编号所占用的位置是10位。
+      3. 块编号，表明改行所在文件的块的位置块编号需要22位。
+      4. 行编号，表明该行在行目录中的具体位置行编号需要16位。  
+  Oracle的物理扩展ROWID有18位，每位采用64位编码，分别用A~Z、a~z、0~9、+、/共64个字符表示。
+  A表示0，B表示1，……Z表示25，a表示26，……z表示51，0表示52，……，9表示61，+表示62，/表示63。
+  rowid:在我们插入数据的时候oracle会根据数据的物理特征生成一个18位以64位编码的字符串作为唯一标识,
+  是不会发生改变的
+  */
+--显示rowid
+select e.*,rowid from emp e;
+--取第一行数据
+select e.* from emp e where rowid=(select min(rowid) from emp);
+
+                                          --分析函数：用来计算排名
+ /*
+ 分析函数和聚合函数的区别就是：分析函数会返回多行数据
+ */                              
+--rank() over():存在并列的情况 ，会发生跳跃 11345
+--dense_rank() over():存在并列的情况 ，不会发生跳跃 11234
+--row_number() over():不存在并列的情况 ，不会发生跳跃 12345
+--在分析函数中使用partition by代表sql语句中的group by
+--rank() over() 11345
+select empno,ename,sal,deptno,rank() over(partition by deptno order by sal desc) 排名 from emp;
+--dense_rank() over() 11234
+select empno,ename,sal,deptno,dense_rank() over(partition by deptno order by sal desc) 排名 from emp;
+--row_number() over() 12345
+select empno,ename,sal,deptno,row_number() over(partition by deptno order by sal desc) 排名 from emp;
+--综合
+select empno,ename,sal,deptno,
+rank() over(partition by deptno order by sal desc) ro,
+dense_rank() over(partition by deptno order by sal desc) dro,
+row_number() over(partition by deptno order by sal desc) rno
+from emp;
+
+--查询出第5-8个员工记录,按工资从高往低排序 7698,7782,7499,7844
+--一、使用rownum
+select e3.* from(
+select e2.*,rownum r from 
+(select e1.* from emp e1 order by sal desc) e2) e3
+where r between 5 and 8; 
+
+--二、使用row_number() over()
+select e2.* from (select e.*,row_number() over(order by sal desc) rno from emp e) e2 where rno between 5 and 8;
+
+
+----------------------------------------------------------------------------------------
+
+--plsql:过程化sql语句
+declare
+       i number(5) := 3000;
+begin
+       select sal into i from emp where ename='KING'; 
+       dbms_output.put_line('i的值：'||i);
+end;
+
+--定义行类型变量
+select * from emp where ename='SCOTT';
+declare
+       emp_row emp%rowtype;
+begin
+       select * into emp_row from emp where ename='SCOTT'; 
+       dbms_output.put_line('编号：'||emp_row.empno||'姓名：'||emp_row.ename||'，工资：'||emp_row.sal);
+end;
+
+--loop循环
+declare
+       i number(3):=0;
+begin
+       loop
+         dbms_output.put_line(i);
+         i:=i+1;
+         exit when i>100;
+       end loop;
+end;
+
+
+--for循环
+declare 
+begin
+  for v_i in 1..9 loop
+      for v_y in 1..v_i loop
+          dbms_output.put(v_y||'*'||v_i||'='||(v_y*v_i)||'   ');
+      end loop;  
+           dbms_output.new_line();
+  end loop;
+end;
+
+
+--while循环
+declare
+       i number(3):=0;
+begin
+       while i<100 loop
+         dbms_output.put_line(i);
+         i:=i+1;
+       end loop;
+end;
+
+--异常处理
+declare
+       v_sal emp.sal%type; 
+begin
+       select sal into v_sal from emp where deptno=30;
+       exception
+              when TOO_MANY_ROWS then
+                   dbms_output.put_line('返回多个值');
+       dbms_output.put_line('----------------------');             
+end;
+         
+--自定义异常名称,绑定异常编码
+alter table dept add constraint pk_dept_deptno primary key(deptno);
+alter table emp add constraint fk_emp_dept foreign key(deptno) references dept(deptno);
+
+declare
+       no_deptno_id exception;
+       pragma exception_init(no_deptno_id,-02291);
+begin
+       update emp set deptno=60  where empno=1234;
+       exception 
+              when no_deptno_id then
+                   dbms_output.put_line('没有该部门编号');
+end;
+
+
+
+                                  --游标
+/*
+   隐式游标:当我们执行DML语句的时候系统会自动的给该语句生成隐式游标,隐式游标的名称固定为sql
+   显式游标:
+       静态游标:我们在定义游标的时候就已经把数据放到游标里面了
+       动态游标(自定义游标+系统游标):
+*/
+
+--静态游标
+declare
+     cursor cs_emp is select * from emp;
+     emp_row emp%rowtype;
+begin
+      open cs_emp;
+      loop
+           fetch cs_emp into emp_row;
+           exit when cs_emp%notfound;
+           dbms_output.put_line('loop员工编号:'||emp_row.empno||',员工姓名:'||emp_row.ename||',薪资:'||emp_row.sal);
+      end loop;
+      close cs_emp;
+end;
+
+--自定义动态游标
+declare
+      type cs_emp_type is ref cursor return emp%rowtype;
+      cs_emp cs_emp_type;
+      emp_row emp%rowtype;
+begin
+      open cs_emp for select * from emp;
+      loop
+           fetch cs_emp into emp_row;
+           exit when cs_emp%notfound;
+           dbms_output.put_line('loop员工编号:'||emp_row.empno||',员工姓名:'||emp_row.ename||',薪资:'||emp_row.sal);
+      end loop;
+      close cs_emp;
+end;
+
+--系统动态游标
+declare 
+      cs_emp sys_refcursor;
+      emp_row emp%rowtype;
+begin
+      open cs_emp for select * from emp;
+      loop
+           fetch cs_emp into emp_row;
+           exit when cs_emp%notfound;
+           dbms_output.put_line('loop员工编号:'||emp_row.empno||',员工姓名:'||emp_row.ename||',薪资:'||emp_row.sal);
+      end loop;
+      close cs_emp;
+end;
+
+
