@@ -226,5 +226,210 @@ update emp set ename='ALLEN' where empno=7369;
 alter table emp add constraint ch_emp_sal check(sal>100 and sal <10000);
 update emp set sal=12000 where empno=7369;
 
+-----------------------------------------------------------------------------------------
+                                   --简单查询                                                                                    
+--查询所有员工信息
+select * from emp;
+--查询出员工编号，姓名，薪资
+select empno,ename,sal from emp;
+--查询出员工编号，姓名，薪资 以中文显示列名
+select empno 编号,ename 姓名,sal 薪资 from emp;
+--查询出员工编号，姓名，薪资 拼接在一个列显示:员工编号:8329,姓名:dsa,工资:3453
+select '员工编号:'||empno||'，姓名：'||ename||'，工资：'||sal 详情 from emp;
+--查询30号部门的所有员工
+select * from emp where deptno=30;
+--查询出30号部门下面员工在那些工作岗位:distinct去重复
+select distinct(job) from emp where deptno=30;
+--所有字段都重复才算是重复
+select distinct * from emp where deptno=30;
+--只有工资和岗位都重复的时候才算是重复,并且结果只会显示工资和岗位
+select distinct sal,job from emp where deptno=30;
+--查询出30号部门,岗位为SALESMAN的员工
+select * from emp where deptno=30 and job='SALESMAN';
+--查询出不等于30号部门下面的员工
+select * from emp where deptno!=30;
+select * from emp where deptno<>30;
+--查询员工薪资 >=2000 and <=3000 的员工
+select ename,sal from emp where sal between  2000 and 3000;
+select ename,sal from emp where sal>=2000 and sal<=3000;
+--查询出20,30部门下面的员工信息
+select * from emp where deptno in (20,30);
+select * from emp where deptno=20 or deptno=30;
+--查询出没有上级的员工信息
+select * from emp where mgr is null;
+--查询有上级的员工信息
+select * from emp where mgr is not null;
+
+                               --高级查询
+/*
+       模糊匹配：like
+        %:表示匹配任意个字符
+        _:表示匹配一个字符
+*/
+--查询员工姓名包含‘S'的员工
+select ename from emp where ename like '%S%';
+--查询员工姓名第两个字符为’C'的员工
+select ename from emp where ename like '_C%';
+--根据员工的工资进行排序:desc倒叙,asc正序
+select ename,sal from emp order by sal;
+select ename,sal from emp order by sal desc;
+--对30部门的员工按工资进行排序
+select ename,sal,deptno from emp where deptno=30 order by sal desc;
+/*
+子查询:sql语句的嵌套,里面的sql语句叫子句,外面的叫主句,一条sql语句查询出来的结果可以作为一张虚拟表,
+        另外一条sql语句可以从这张虚拟表中再次查询出数据
+        单行子查询:子句只返回一个结果
+        多行子查询:子句返回多个结果
+相关子查询:子句在查询的过程中会拿到主句的某个字段作为条件,主句每执行一条记录,子句就会执行一遍
+非相关子查询:子句只执行一次,执行结果交给主句使用
+*/
+--查询出‘SALES’部门(dept)下面的员工信息(emp):在where条件里面使用子查询
+select * from emp where deptno=(select deptno from dept where dname='SALES');
+--列出薪金比“SMITH”多的所有员工
+select ename,sal from emp where sal>(select sal from emp where ename='SMITH');
+--查询出和员工‘SCOTT’在同一个部门的员工
+select ename,deptno from emp where deptno=(select deptno from emp where ename='SCOTT') and ename !='SCOTT';
+--相关子查询并且在select中使用子查询:查询出员工编号，姓名，job，薪资，以及所在部门名称
+select e.empno 员工编号,e.ename 姓名,e.job 职位,e.sal 薪资,(select d.dname from dept d where d.deptno=e.deptno) 部门名称 from emp e;
+--相关子查询:列出所有员工的姓名及其直接上级的姓名
+--e1 员工表,e2 上司表
+select e1.ename 员工,(select e2.ename from emp e2 where e2.empno=e1.mgr) 上司 from emp e1;
+--exists :判断后面的子句有没有查询出结果,如果查询出结果返回true否则返回false
+--查询存在员工的部门信息
+select d.* from dept d where exists (select e.ename from emp e where e.deptno=d.deptno);
+--查询不存在员工的部门信息
+--not exists:相反
+select d.* from dept d where not exists (select e.ename from emp e where e.deptno=d.deptno);
+
+                 
+                                   --多表连接查询
+/*
+多表连接查询;我们想要的结果里面包含多张表的数据
+*/
+--笛卡尔积:那一张表里面的每一条记录和第二张表的每一条记录连接
+select * from emp,dept;
+--等值连接：连接条件用“=”进行关联,主外键的等值连接
+--查询出所有的员工信息以及所在部门信息
+select e.*,d.dname,d.loc from emp e,dept d where e.deptno=d.deptno; 
+--左连接:以左边表为主,会显示左边表所有信息,如果和右边有有关联,那么显示右面表数据,如果没有关联那么显示空值
+select * from emp e left join dept d on e.deptno=d.deptno;
+--右连接
+select * from emp e right join dept d on e.deptno=d.deptno;
+--使用+号的左右连接
+--+号写在右面表示左连接,+号写在左边表示右连接
+--左连接
+select * from emp e,dept d where e.deptno=d.deptno(+);
+--右连接
+select * from emp e,dept d where e.deptno(+)=d.deptno;
+
+create table emp1 as select * from emp;
+delete from emp where ename='SMITH';
+insert into emp(empno,ename,job,mgr,hiredate,sal,comm,deptno,id) values(1234,'QIAN','BOSS',null,to_date('1999-01-01','yyyy-mm-dd'),1000,null,10,sys_guid());
+-- union all  ：把两个查询结果联合在一起查询显示，会有重复记录
+select * from emp union all select * from emp1;
+--union  ：把两个查询结果联合在一起查询显示，不会有重复记录
+select * from emp union select * from emp1; 
+--intersect :交集：把两个查询结果完全相同的记录查询显示
+select * from emp intersect select * from emp1;
+--minus ：补集：减去后面的查询结果，并且减去相交的结果
+select * from emp minus select * from emp1;
+
+---------------------------------------------------------------------------------------
+
+--常用的函数                              
+                                --字符函数 
+--lower(待转换的字符串):将参数里面的字符串，转换成小写
+select lower('ABCED') from dual;
+--upper(待转换的字符串):将参数里面的字符串，转换成大写
+select upper('abcde') from dual;
+--initCap (待转换的字符串)：将字符串首字母转换成大写，其余的转换成小写
+select initCap('i love you') from dual;
+--concat(字符串1，字符串2):只能拼接两个字符串,将字符串1和字符串2连接起来获得一个新的字符串
+select concat('hello ','world') from dual;
+--instr(字符串，查找字符):返回该字符在字符串中的第一个出现位置,下标从1开始
+select instr('abcdefg','e') from dual;
+--substr(字符串，开始位置，数量):截取字符串,包括开始的位置,从开始位置开始截取指定位数的字符
+select substr('abcdefg',3,4) from dual;
+--32432423@sina.com截取sina
+select substr('32432423@sina.com',instr('32432423@sina.com','@')+1,instr('32432423@sina.com','.')-instr('32432423@sina.com','@')-1) from dual;
+--lpad(补齐字符串，整体补齐的位数，不够位数就用指定的字符)：左补齐
+select lpad('32',4,'##') from dual;
+--rpad(补齐字符串，整体补齐的位数，不够位数就用指定的字符)：右补齐
+select rpad('32',4,'##') from dual;
+--length： 返回字符串的长度(字符) 2
+select length('汉字') from dual;
+--lengthb:字节      
+select lengthb('汉字') from dual;
+
+                              --数字函数
+--ceil(待向上取整的值):天花板 2
+select ceil(1.01) from dual;
+--floor(待向下取整的值):地板 1
+select floor(1.99) from dual;
+--mod (值1，值2):% 取余 1
+select mod(10,3) from dual;
+--round(待四舍五入的值，保留小数点的位数):
+select round(3.1415926,2) from dual;
+--trunc(待截断的值，保留小数位) 2.5 
+select trunc(2.59,1) from dual;
+
+                          --日期函数
+--to_date()字符串和日期转换函数
+select to_date('2019-09-09 20:00','yyyy-mm-dd hh24:mi:ss') from dual;
+--add_months(待增加的日期，要增加的月份数)：把增加月份数后的日期返回
+select add_months(to_date('2019-7-5','yyyy-mm-dd'),5) from dual;
+--next_day(指定的日期,星期几)：返回指定日期的下一个的星期几
+select next_day(sysdate,'星期五') from dual;
+--trunc(指定的日期)/*截断时分秒，返回年月日*/
+select trunc(sysdate) from dual;
+--to_char(指定的日期,字母格式):返回指定格式的时间信息
+select to_char(sysdate,'yyyy-mm-dd') from dual;
+                         
+                          --其他函数
+--nvl(值1，值2)： 如果值1为空，则返回值2,反之则返回值1
+select empno 编号,ename 姓名,sal+nvl(comm,0) 收入 from emp;
+--decode(值1，if1,then1,if2,then2,else ):判断  给员工涨薪,10部门涨10%,20部门涨20%.....
+update emp set sal=sal*decode(deptno,10,1.1,20,1.2,1.3);
+select * from emp;
+                         --分组以及聚合函数：基于多行返回一个结果
+--求所有的员工平均薪资,最高工资,最低工资，总工资，总人数
+select avg(sal) 平均薪资,max(sal) 最高工,min(sal) 最低工资,sum(sal) 总工资,count(1) 总人数 from emp;
+--count求有奖金人数:如果参数为单一字段那么如果字段值为null就不算
+select count(comm) from emp;
+--分组group by
+/*
+如果分组那么select后面只能写聚合函数以及组名
+*/
+--根据部门分组，查询每个部门的平均薪资avg()，最小薪资min()，最大薪资max()，总薪资sum()，部门人数count()
+select round(avg(sal),2) 平均薪资,min(sal) 最小薪资,max(sal) 最大薪资,sum(sal) 总薪资,count(1) 部门人数 from emp group by deptno;
+--where后面不能跟聚合函数,where只能用来筛选数据,如果想对组进行筛选要用having
+--平均工资大于2000的部门
+select deptno 部门,avg(sal) 平均工资 from emp group by deptno having avg(sal)>2000;
+--大于平均工资的员工
+select ename 姓名,sal 工资,e.* from emp,(select avg(sal) 平均工资 from emp) e where sal>(select avg(sal) from emp);
+--查询10,20部门的员工的平均工资,并且平均工资要大于2000
+select deptno 部门,avg(sal) 平均工资 from emp where deptno in (10,20) group by deptno having avg(sal)>2000 order by avg(sal) desc;
+--case when练习
+--给员工涨薪,10部门涨10%,20部门涨20%....
+update emp set sal=sal*(
+       case deptno
+         when 10 then 1.1
+         when 20 then 1.2
+         when 30 then 1.3
+         when 40 then 1.4
+         else 1
+       end
+);
+select * from emp;
+--统计每个部门每个岗位的人数
+select distinct job from emp
+select deptno,
+       count(case job when 'CLERK' then 1 else null end) CLERK,
+       count(case job when 'SALESMAN' then 1 else null end) SALESMAN,
+       count(case job when 'PRESIDENT' then 1 else null end) PRESIDENT,
+       count(case job when 'MANAGER' then 1 else null end) MANAGER,
+       count(case job when 'ANALYST' then 1 else null end) ANALYST
+from emp group by deptno;
 
 
+------------------------------------------------------------------------------------------
