@@ -803,22 +803,136 @@ end;
 --声明函数
 create or replace package pack_emp
 is
-       function add_sal_and_comm(v_empno emp.ename%type) return emp.sal%type;
+       --声明函数
+       function add_sal_and_comm(in_empno emp.empno%type) return emp.sal%type;
+       --声明存储过程
+       procedure query_all_emp(emp_cur out sys_refcursor);
+       
 end;
 
 --编写主体
-create or replace package body pack_epm
+create or replace package body pack_emp
 is
-       --给add_sal_and_comm定义主体
-       create or replace function add_sal_and_comm(
-              in_empno in emp.empno%type
-       )return emp.sal%type
+       --定义函数
+       function add_sal_and_comm(in_empno emp.empno%type) return emp.sal%type
        is
-               in_empno emp.empno%type;
-               sal_and_comm emp.sal%type;
+                sal_and_comm emp.sal%type;
        begin
-               select (sal+nvl(comm,0)) into sal_and_comm from emp where empno=in_empno;
-               return sal_and_comm;
-       end add_sal_and_comm;
+                select (sal+nvl(comm,0)) into sal_and_comm from emp where empno=in_empno;
+                return sal_and_comm;
+       end; 
+       
+       --定义存储 过程
+       procedure query_all_emp(emp_cur out sys_refcursor)
+       is         
+       begin
+                 open emp_cur for select * from emp;
+       end;
 end;
 
+--调用函数
+select pack_emp.add_sal_and_comm(7369) from dual;
+
+--调用存储过程
+declare
+       emp_cur sys_refcursor;
+       emp_row emp%rowtype;
+begin  
+       pack_emp.query_all_emp(emp_cur);
+       loop
+               fetch emp_cur into emp_row;
+               exit when emp_cur%notfound;
+               dbms_output.put_line('编号:'||emp_row.empno||',姓名:'||emp_row.ename||',薪资:'||emp_row.sal);
+       end loop;
+       close emp_cur;
+end;
+
+
+--触发器:发生某些特定操作(insert,delete,update)的时候自动执行的一段业务逻辑
+--当我们往bank里面添加数据之前从序列中获取写一个,添加为该数据的主键
+--建表bank,通过触发器让主键自动增长
+create table bank(
+       id number(3),
+       name varchar2(20),
+       pwd varchar2(20),
+       money number(5,2)
+)
+--设主键
+alter table bank add constraint pk_bank primary key(id);
+
+--自动增长器
+create sequence seq_bank
+       maxvalue 100
+       minvalue 1
+       increment by 1;
+--触发器
+create or replace trigger tri_bank
+before insert on bank
+for each row
+begin
+    select seq_bank.nextval into :new.id from dual;
+end;
+
+--插入数据
+insert into bank(name,pwd,money) values('aaa','123456',123.00) ;
+insert into bank(name,pwd,money) values('bbb','123456',223.00) ;
+insert into bank(name,pwd,money) values('ccc','123456',790.00) ;
+
+
+select * from bank;
+
+
+--创建emp日志表
+create table emp_log(
+       id number(4) primary key,
+       c_type number(1),
+       c_date date,
+       c_empno number(4)
+)
+
+create sequence seq_emp_log
+       maxvalue 9999
+       minvalue 1
+       increment by 1;
+
+create or replace trigger tri_emp_log
+before insert on emp_log
+for each row
+begin
+    select seq_emp_log.nextval into :new.id from dual;
+end;
+
+create or replace trigger tri_emp_modify
+after update or delete on emp
+for each row
+when(old.deptno!=30)
+declare 
+    c_type number(1):=1;
+begin
+    if updating then
+    c_type:=0;
+    elsif deleting then
+    c_type:=1;
+    end if;
+    insert into emp_log(c_type,c_date,c_empno) values(c_type,sysdate,:old.empno);
+end;
+
+--测试
+select * from emp;
+select * from emp_log;
+--修改
+update emp set ename='PIPIXIA' where empno=7369;
+commit;
+--删除
+delete from emp where ename='JONES';
+commit;
+update emp set empno=111 where ename='CLARK';
+commit;
+--添加
+insert into emp(empno,ename,job,mgr,hiredate,sal,comm,deptno) values(2222,'AAA','BOSS',111,to_date('1999-01-01','yyyy-mm-dd'),10000,2000,10);
+commit;
+--修改30部门的员工
+update emp set ename='BBB' where empno=7499;
+commit;
+
+-------------------------------------------------------------------------------------
